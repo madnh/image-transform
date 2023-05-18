@@ -19,13 +19,19 @@
   "dependencies": {
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
-    "@oclif/plugin-plugins": "^2.4.7"
+    "@oclif/plugin-plugins": "^2.4.7",
+    "fs-extra": "^11.1.1",
+    "p-limit": "^3.1.0",
+    "p-pipe": "^3.1.0",
+    "sharp": "^0.32.1"
   },
   "devDependencies": {
     "@oclif/test": "^2.3.19",
     "@types/chai": "^4",
+    "@types/fs-extra": "^11.0.1",
     "@types/mocha": "^9.0.0",
-    "@types/node": "^16.18.29",
+    "@types/node": "^14.18.47",
+    "@types/sharp": "^0.32.0",
     "chai": "^4",
     "eslint": "^7.32.0",
     "eslint-config-oclif": "^4",
@@ -69,7 +75,7 @@
     "lint:fix": "npm run eslint:fix && npm run format:fix"
   },
   "engines": {
-    "node": ">=12.0.0"
+    "node": ">=14.15.0"
   },
   "bugs": "https://github.com/madnh/image-transform/issues",
   "keywords": [
