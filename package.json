@@ -30,8 +30,10 @@
     "eslint": "^7.32.0",
     "eslint-config-oclif": "^4",
     "eslint-config-oclif-typescript": "^1.0.3",
+    "eslint-config-prettier": "^8.8.0",
     "mocha": "^9",
     "oclif": "^3",
+    "prettier": "^2.8.8",
     "shx": "^0.3.3",
     "ts-node": "^10.9.1",
     "tslib": "^2.5.0",
@@ -54,19 +56,27 @@
   },
   "scripts": {
     "build": "shx rm -rf dist && tsc -b",
-    "lint": "eslint . --ext .ts --config .eslintrc",
     "postpack": "shx rm -f oclif.manifest.json",
     "posttest": "npm run lint",
     "prepack": "npm run build && oclif manifest && oclif readme",
     "test": "mocha --forbid-only \"test/**/*.test.ts\"",
-    "version": "oclif readme && git add README.md"
+    "version": "oclif readme && git add README.md",
+    "format:lint": "prettier --list-different \"src\" \"test\"",
+    "format:fix": "npm run format:lint -- --write",
+    "eslint:lint": "eslint . --ext .ts --config .eslintrc",
+    "eslint:fix": "npm run eslint:lint -- --fix",
+    "lint": "npm run eslint:lint && npm run format:lint",
+    "lint:fix": "npm run eslint:fix && npm run format:fix"
   },
   "engines": {
     "node": ">=12.0.0"
   },
   "bugs": "https://github.com/madnh/image-transform/issues",
   "keywords": [
-    "oclif"
+    "oclif",
+    "image",
+    "transform",
+    "sharp"
   ],
   "types": "dist/index.d.ts"
 }
