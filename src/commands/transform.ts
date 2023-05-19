@@ -123,7 +123,7 @@ export default class Transform extends BaseCommand<typeof Transform> {
       ignoreInitial: !initial,
     })
 
-    watcher.on('all', async () => {
+    watcher.on('change', async () => {
       this.logger.info('File changed')
       await this.runOne(imageFile, profile)
     })
