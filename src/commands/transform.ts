@@ -6,8 +6,10 @@ import pLimit from 'p-limit'
 
 import SharpTransform from '../services/sharp/transform'
 import { SharpProfile } from '../services/sharp/profile'
+import { BaseCommand } from '../BaseCommand'
+import { formatSize } from '../utils/mixed'
 
-export default class Transform extends Command {
+export default class Transform extends BaseCommand<typeof Transform> {
   static description =
     'Manually transform images, if `--width` and `--height`` are not provided, the image will be keep original size'
 
@@ -86,17 +88,15 @@ export default class Transform extends Command {
   }
 
   public async run(): Promise<void> {
-    const { args, flags } = await this.parse(Transform)
+    const imageFile = cwdPath(this.args.file)
 
-    const imageFile = cwdPath(args.file)
-
-    this.log('Image', imageFile)
+    this.logger.info('Image:', imageFile)
 
     const profile = await this.getProfile()
 
-    if (flags.watch) {
-      this.log('Watching file changes...')
-      await this.runWatch(imageFile, profile, flags.watchInitial)
+    if (this.flags.watch) {
+      this.logger.info('Watching file changes...')
+      await this.runWatch(imageFile, profile, this.flags.watchInitial)
     } else {
       await this.runOne(imageFile, profile)
     }
@@ -111,7 +111,7 @@ export default class Transform extends Command {
     })
 
     watcher.on('all', async () => {
-      this.log('File changed')
+      this.logger.info('File changed')
       await this.runOne(imageFile, profile)
     })
   }
@@ -121,43 +121,40 @@ export default class Transform extends Command {
   }
 
   async getProfile(): Promise<SharpProfile> {
-    const { flags } = await this.parse(Transform)
-
-    const width = flags.width
-    const height = flags.height
+    const width = this.flags.width
+    const height = this.flags.height
 
     const profile: SharpProfile = {
       transform: {
         resize: {
           width,
           height,
-          withoutEnlargement: !flags.withEnlargement,
-          fit: 'contain',
+          withoutEnlargement: !this.flags.withEnlargement,
         },
       },
       export: {},
       output: {
-        dir: flags.out,
+        dir: this.flags.out,
         fileName: {
-          alias: flags.alias,
-          aliasSeparator: flags.aliasSeparator,
+          alias: this.flags.alias,
+          aliasSeparator: this.flags.aliasSeparator,
         },
       },
     }
 
-    if (flags.jpg) {
+    if (this.flags.jpg) {
       profile.export.jpeg = true
     }
 
-    if (flags.png) {
+    if (this.flags.png) {
       profile.export.png = true
     }
 
-    if (flags.webp) {
+    if (this.flags.webp) {
       profile.export.webp = true
     }
 
-    if (flags.avif) {
+    if (this.flags.avif) {
       profile.export.avif = true
     }
 
@@ -172,18 +169,22 @@ export default class Transform extends Command {
     }
 
     const meta = await rawSharp.metadata()
-    this.log(' - Format:', meta.format)
-    this.log(' - Width:', meta.width)
-    this.log(' - Height:', meta.height)
+    this.logger.info(' - Format:', meta.format)
+    this.logger.info(' - Width:', meta.width)
+    this.logger.info(' - Height:', meta.height)
+    if (meta.size !== undefined) {
+      this.logger.info(' - Size:', formatSize(meta.size))
+    }
 
     const transform = new SharpTransform(profile, rawSharp)
 
     const limit = pLimit(1)
     const exportPromises = transform.export(imageFile).map((fn) => limit(fn))
 
-    ux.action.start('Transforming')
+    this.logger.start('Transforming')
     const result = await Promise.all(exportPromises)
-    ux.action.stop()
+    this.logger.success('Transformed')
+
     return result
   }
 }
