@@ -39,3 +39,55 @@ export function percent(base: number, value: number, options?: PercentOptions): 
 
   return `${sign && signChar} ${result}${char ? '%' : ''}`.trim()
 }
+
+/**
+ * Replace text content by object
+ * @param {string} text Text to replace
+ * @param {Record<string, string>} replaceMap Replace map
+ * @returns {string} Replaced text
+ * @example
+ * ```ts
+ * replace('Hello {name}', { name: 'world' }) // Hello world
+ * ```
+ */
+/**
+ * Replace text content by object
+ * @param {string} text Text to replace
+ * @param {Record<string, string>} replaceMap Replace map
+ * @param {'empty' | 'keep' | 'keep-raw' | 'throw'} notFound Action when key not found
+ * @returns {string} Replaced text
+ * @example
+ * ```ts
+ *  replace('{name}{size}.{ext}', { name: 'image', size: '@2x', ext: 'jpg' }}') // image@2x.jpg
+ *  replace('{name}{size}.{ext}', { name: 'image', ext: 'jpg' }, 'empty') // image.jpg
+ *  replace('{name}{size}.{ext}', { name: 'image', ext: 'jpg' }, 'keep') // imagesize.jpg
+ *  replace('{name}{size}.{ext}', { name: 'image', ext: 'jpg' }, 'keep-raw') // image{size}.jpg
+ *  replace('{name}{size}.{ext}', { name: 'image', ext: 'jpg' }, 'throw') // throw error
+ * ```
+ */
+export function replace(
+  text: string,
+  replaceMap: Record<string, string>,
+  notFound: 'empty' | 'keep' | 'keep-raw' | 'throw' = 'keep-raw'
+): string {
+  return text.replace(/{([^}]+)}/g, (_, key) => {
+    if (key in replaceMap) return replaceMap[key]
+
+    switch (notFound) {
+      case 'empty':
+        return ''
+      case 'keep':
+        return key
+      case 'keep-raw':
+        return `{${key}}`
+      case 'throw':
+        throw new Error(`Key "${key}" not found in replace map`)
+    }
+  })
+}
+
+export function replaceAll(text: string, replaceMap: Record<string, string>): string {
+  return Object.entries(replaceMap).reduce((result, [key, value]) => {
+    return result.replace(new RegExp(key, 'g'), value)
+  }, text)
+}

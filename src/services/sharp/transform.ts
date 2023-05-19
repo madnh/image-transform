@@ -99,19 +99,17 @@ export default class Transform {
 
       const result = await sharp.toFile(newFile.file)
 
-      console.log(`Exported ${newFile.file}`, `${result.width}x${result.height}`, formatSize(result.size))
+      console.log(`Exported ${newFile.file} \t\t ${result.width}x${result.height} \t ${formatSize(result.size)}`)
       return result
     }
   }
 
   exportTarget(rawFile: string, newFileExt: string): ChangeNameResult {
-    const { alias, aliasSeparator } = this.profile.output?.fileName || {}
-    const newFileNameAppend = alias ? `${aliasSeparator}${alias}` : ''
-
     return changeName(rawFile, {
       ext: newFileExt,
-      append: newFileNameAppend,
       dir: this.profile.output?.dir,
+      format: this.profile.output?.fileNameFormat,
+      replace: this.profile.output?.fileNameReplace,
     })
   }
 

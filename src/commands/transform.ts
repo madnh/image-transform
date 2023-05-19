@@ -1,4 +1,4 @@
-import { Args, Command, Flags, ux } from '@oclif/core'
+import { Args, Flags } from '@oclif/core'
 import { cwdPath } from '../utils/paths'
 
 import sharp, { OutputInfo } from 'sharp'
@@ -10,38 +10,49 @@ import { BaseCommand } from '../BaseCommand'
 import { formatSize } from '../utils/mixed'
 
 export default class Transform extends BaseCommand<typeof Transform> {
-  static description =
-    'Manually transform images, if `--width` and `--height`` are not provided, the image will be keep original size'
+  static description = `Transform images.
+
+  Name format:
+        {name} - new name (without ext)
+        {ext} - new extension
+        {orgName} - original file name
+        {orgExt} - original file extension
+`
 
   static examples = [
     '<%= config.bin %> <%= command.id %> images/image-1.jpg --webp',
     '<%= config.bin %> <%= command.id %> images/image-1.jpg --webp --width 500 --out images/optimized',
     '<%= config.bin %> <%= command.id %> images/image-1.jpg --avif --png --height=300',
-    '<%= config.bin %> <%= command.id %> images/image-1.jpg -w 1000 --webp --avif --png --alias small --aliasSeparator=@',
+    `<%= config.bin %> <%= command.id %> images/image-1.jpg -w 1000 --webp --avif --png --name-format='{name}@2x.{ext}'`,
+    '<%= config.bin %> <%= command.id %> images/image-1.jpg --webp --name-remove=__raw',
   ]
 
   static flags = {
     withEnlargement: Flags.boolean({
       default: false,
+      aliases: ['with-enlargement'],
       description: 'Allow image enlargements',
     }),
     width: Flags.integer({
       char: 'w',
-      helpValue: '1000',
+      helpValue: 'number',
       description: 'Resize width, default is auto scale with height',
     }),
 
     height: Flags.integer({
       char: 'h',
+      helpValue: 'number',
       description: 'Resize height, default is auto scale with width',
     }),
 
-    alias: Flags.string({
-      description: 'Alias name of exported images',
+    nameFormat: Flags.string({
+      aliases: ['name-format'],
+      default: '{name}.{ext}',
+      description: 'Format of output file name',
     }),
-    aliasSeparator: Flags.string({
-      description: 'String to join alias and file name',
-      default: '__',
+    nameRemove: Flags.string({
+      aliases: ['name-remove'],
+      description: 'Remove part of file name',
     }),
 
     jpg: Flags.boolean({
@@ -65,6 +76,7 @@ export default class Transform extends BaseCommand<typeof Transform> {
     keepMeta: Flags.boolean({
       default: false,
       description: 'Keep image meta data',
+      aliases: ['keep-meta'],
     }),
 
     out: Flags.string({
@@ -80,6 +92,7 @@ export default class Transform extends BaseCommand<typeof Transform> {
     watchInitial: Flags.boolean({
       default: false,
       description: 'Watch file changes, and run initial transform for current file',
+      aliases: ['watch-initial'],
     }),
   }
 
@@ -135,10 +148,8 @@ export default class Transform extends BaseCommand<typeof Transform> {
       export: {},
       output: {
         dir: this.flags.out,
-        fileName: {
-          alias: this.flags.alias,
-          aliasSeparator: this.flags.aliasSeparator,
-        },
+        fileNameFormat: this.flags.nameFormat,
+        fileNameReplace: this.flags.nameRemove ? { [this.flags.nameRemove]: '' } : undefined,
       },
     }
 

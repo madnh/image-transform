@@ -13,12 +13,17 @@ export type SharpProfile = {
     avif?: AvifOptions | true
   }
   output?: {
-    fileName?: {
-      append?: string
-      prepend?: string
-      alias?: string
-      aliasSeparator?: string
-    }
+    /**
+     * Format of output file name
+     *   {name} - new name (without ext)
+     *   {ext} - new extension
+     *   {orgName} - original file name
+     *   {orgExt} - original file extension
+     */
+    fileNameFormat?: string
+
+    // Replace filename before process for new filename
+    fileNameReplace?: Record<string, string>
     dir?: string
   }
 }
