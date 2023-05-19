@@ -60,6 +60,11 @@ export default class Transform extends Command {
       description: 'Export to avif',
     }),
 
+    keepMeta: Flags.boolean({
+      default: false,
+      description: 'Keep image meta data',
+    }),
+
     out: Flags.string({
       char: 'o',
       description: 'Output directory, if omit then use the same directory with input file',
@@ -161,6 +166,10 @@ export default class Transform extends Command {
 
   async transformFile(imageFile: string, profile: SharpProfile): Promise<OutputInfo[]> {
     const rawSharp = sharp(imageFile)
+
+    if (this.flags.keepMeta) {
+      rawSharp.withMetadata()
+    }
 
     const meta = await rawSharp.metadata()
     this.log(' - Format:', meta.format)
