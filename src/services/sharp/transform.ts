@@ -5,6 +5,7 @@ import { SharpProfile } from './profile'
 import fsExtra from 'fs-extra'
 
 export type TapFunction<T extends any> = (sharp: Sharp) => T
+export type ExportFunction = () => Promise<OutputInfo>
 
 export default class Transform {
   protected rawSharp: Sharp | null = null
@@ -63,36 +64,35 @@ export default class Transform {
     return this.result
   }
 
-  export(rawFile: string): Array<() => Promise<OutputInfo>> {
-    const promises: Array<() => Promise<OutputInfo>> = []
+  export(rawFile: string): ExportFunction[] {
+    const exportFns: ExportFunction[] = []
 
     if (this.profile.export.jpeg) {
       const options: JpegOptions = this.profile.export.jpeg === true ? {} : this.profile.export.jpeg
-      promises.push(this.createExportFn(jpeg(options), rawFile, 'jpg'))
+      exportFns.push(this.createExportFn(jpeg(options), rawFile, 'jpg'))
     }
 
     if (this.profile.export.png) {
       const options: PngOptions = this.profile.export.png === true ? {} : this.profile.export.png
-      promises.push(this.createExportFn(png(options), rawFile, 'png'))
+      exportFns.push(this.createExportFn(png(options), rawFile, 'png'))
     }
 
     if (this.profile.export.webp) {
       const options: WebpOptions = this.profile.export.webp === true ? {} : this.profile.export.webp
-      promises.push(this.createExportFn(webp(options), rawFile, 'webp'))
+      exportFns.push(this.createExportFn(webp(options), rawFile, 'webp'))
     }
 
     if (this.profile.export.avif) {
       const options: AvifOptions = this.profile.export.avif === true ? {} : this.profile.export.avif
-      promises.push(this.createExportFn(avif(options), rawFile, 'avif'))
+      exportFns.push(this.createExportFn(avif(options), rawFile, 'avif'))
     }
 
-    return promises
+    return exportFns
   }
 
   createExportFn(exporter: SharpFn, rawFile: string, newFileExt: string): () => Promise<OutputInfo> {
     return async (): Promise<OutputInfo> => {
       const newFile = this.exportTarget(rawFile, newFileExt)
-      console.log(`Exporting`, newFile)
       const sharp = this.tap(exporter)
       await fsExtra.ensureDir(newFile.dir)
 

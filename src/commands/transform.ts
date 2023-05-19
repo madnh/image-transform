@@ -1,7 +1,7 @@
-import { Args, Command, Flags } from '@oclif/core'
+import { Args, Command, Flags, ux } from '@oclif/core'
 import { cwdPath } from '../utils/paths'
 
-import sharp from 'sharp'
+import sharp, { OutputInfo } from 'sharp'
 import pLimit from 'p-limit'
 
 import SharpTransform from '../services/sharp/transform'
@@ -64,6 +64,16 @@ export default class Transform extends Command {
       char: 'o',
       description: 'Output directory, if omit then use the same directory with input file',
     }),
+
+    watch: Flags.boolean({
+      default: false,
+      description: 'Watch file changes',
+    }),
+
+    watchInitial: Flags.boolean({
+      default: false,
+      description: 'Watch file changes, and run initial transform for current file',
+    }),
   }
 
   static args = {
@@ -77,15 +87,39 @@ export default class Transform extends Command {
 
     this.log('Image', imageFile)
 
-    const rawSharp = sharp(imageFile)
+    const profile = await this.getProfile()
 
-    const meta = await rawSharp.metadata()
+    if (flags.watch) {
+      this.log('Watching file changes...')
+      await this.runWatch(imageFile, profile, flags.watchInitial)
+    } else {
+      await this.runOne(imageFile, profile)
+    }
+  }
+
+  async runWatch(imageFile: string, profile: SharpProfile, initial = false): Promise<void> {
+    const chokidar = require('chokidar')
+    const watcher = chokidar.watch(imageFile, {
+      persistent: true,
+      awaitWriteFinish: true,
+      ignoreInitial: !initial,
+    })
+
+    watcher.on('all', async () => {
+      this.log('File changed')
+      await this.runOne(imageFile, profile)
+    })
+  }
+
+  runOne(imageFile: string, profile: SharpProfile): Promise<any> {
+    return this.transformFile(imageFile, profile)
+  }
+
+  async getProfile(): Promise<SharpProfile> {
+    const { flags } = await this.parse(Transform)
+
     const width = flags.width
     const height = flags.height
-
-    this.log(' - Format:', meta.format)
-    this.log(' - Width:', meta.width)
-    this.log(' - Height:', meta.height)
 
     const profile: SharpProfile = {
       transform: {
@@ -122,12 +156,25 @@ export default class Transform extends Command {
       profile.export.avif = true
     }
 
+    return profile
+  }
+
+  async transformFile(imageFile: string, profile: SharpProfile): Promise<OutputInfo[]> {
+    const rawSharp = sharp(imageFile)
+
+    const meta = await rawSharp.metadata()
+    this.log(' - Format:', meta.format)
+    this.log(' - Width:', meta.width)
+    this.log(' - Height:', meta.height)
+
     const transform = new SharpTransform(profile, rawSharp)
 
     const limit = pLimit(1)
     const exportPromises = transform.export(imageFile).map((fn) => limit(fn))
-    await Promise.all(exportPromises)
 
-    this.log('Done')
+    ux.action.start('Transforming')
+    const result = await Promise.all(exportPromises)
+    ux.action.stop()
+    return result
   }
 }
