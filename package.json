@@ -21,9 +21,11 @@
     "@oclif/plugin-help": "^5",
     "@oclif/plugin-plugins": "^2.4.7",
     "chokidar": "^3.5.3",
+    "consola": "^3.1.0",
     "fs-extra": "^11.1.1",
     "p-limit": "^3.1.0",
     "p-pipe": "^3.1.0",
+    "pretty-bytes": "^5.6.0",
     "sharp": "^0.32.1"
   },
   "devDependencies": {
@@ -49,6 +51,13 @@
   "oclif": {
     "bin": "image-transform",
     "dirname": "image-transform",
+    "additionalHelpFlags": [
+      "-h"
+    ],
+    "additionalVersionFlags": [
+      "-v",
+      "--version"
+    ],
     "commands": "./dist/commands",
     "plugins": [
       "@oclif/plugin-help",

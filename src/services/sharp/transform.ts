@@ -3,6 +3,7 @@ import { AvifOptions, JpegOptions, OutputInfo, PngOptions, Sharp, WebpOptions } 
 import { applyFns, avif, jpeg, png, SharpFn, webp } from './actions'
 import { SharpProfile } from './profile'
 import fsExtra from 'fs-extra'
+import { formatSize } from '../../utils/mixed'
 
 export type TapFunction<T extends any> = (sharp: Sharp) => T
 export type ExportFunction = () => Promise<OutputInfo>
@@ -96,7 +97,10 @@ export default class Transform {
       const sharp = this.tap(exporter)
       await fsExtra.ensureDir(newFile.dir)
 
-      return sharp.toFile(newFile.file)
+      const result = await sharp.toFile(newFile.file)
+
+      console.log(`Exported ${newFile.file}`, `${result.width}x${result.height}`, formatSize(result.size))
+      return result
     }
   }
 
