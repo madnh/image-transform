@@ -106,7 +106,10 @@ export default class Transform extends BaseCommand<typeof Transform> {
     const profile = await this.getProfile()
     const files = await this.getFiles(profile)
 
-    this.logger.info('Files', files)
+    this.logger.debug('Files', files)
+    if (!this.flags.watch) {
+      this.logger.info('Found %d file(s)', files.length)
+    }
 
     if (!this.flags.watch) {
       this.logger.start('Transforming...')
@@ -138,26 +141,25 @@ export default class Transform extends BaseCommand<typeof Transform> {
 
   async getFileFromSource(source: string): Promise<string[]> {
     if (source.includes('*')) {
-      this.logger.info('Glob pattern detected')
+      this.logger.debug('Glob pattern detected')
       return glob(source, {
-        cwd: process.cwd(),
         nodir: true,
+        ignore: '**/.*',
       })
     }
 
     // is file
     const isFileReg = /\.(\w+)$/
     if (isFileReg.test(source)) {
-      this.logger.info('Single file detected')
+      this.logger.debug('Single file detected')
       return [source]
     }
 
-    this.logger.info('Directory detected')
+    this.logger.debug('Directory detected')
     // is dir
     // use glob to find all image Files
     return glob(`${source}/**/*.{jpg,jpeg,png}`, {
       nodir: true,
-      //      cwd: process.cwd(),
     })
   }
 
@@ -166,17 +168,22 @@ export default class Transform extends BaseCommand<typeof Transform> {
     const watcher = chokidar.watch(profile.source!, {
       persistent: true,
       awaitWriteFinish: true,
-      ignore: '**/.*',
+      ignored: /(^|[/\\])\../, // ignore dotfiles
       ignoreInitial: !initial,
+    })
+
+    watcher.on('add', async (file: string) => {
+      this.logger.info('File added: %s', file)
+      await this.transformFile(file, profile)
     })
 
     watcher.on('change', async (file: string) => {
       this.logger.info('File changed: %s', file)
-      await this.runOne(file, profile)
+      await this.transformFile(file, profile)
     })
-    watcher.on('add', async (file: string) => {
-      this.logger.info('File added: %s', file)
-      await this.runOne(file, profile)
+
+    watcher.on('unlink', async (file: string) => {
+      this.logger.info('File detected (not handle) : %s', file)
     })
 
     return watcher
