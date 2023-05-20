@@ -91,3 +91,7 @@ export function replaceAll(text: string, replaceMap: Record<string, string>): st
     return result.replace(new RegExp(key, 'g'), value)
   }, text)
 }
+
+export function toArray<T>(value: T | T[]): T[] {
+  return Array.isArray(value) ? value : [value]
+}

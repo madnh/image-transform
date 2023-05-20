@@ -1,13 +1,12 @@
 import { Args, Flags } from '@oclif/core'
-import { cwdPath } from '../utils/paths'
-
-import sharp, { OutputInfo } from 'sharp'
+import { glob } from 'glob'
 import pLimit from 'p-limit'
+import sharp, { OutputInfo } from 'sharp'
 
-import SharpTransform from '../services/sharp/transform'
+import { BaseCommand } from '../base-command'
 import { SharpProfile } from '../services/sharp/profile'
-import { BaseCommand } from '../BaseCommand'
-import { formatSize } from '../utils/mixed'
+import SharpTransform from '../services/sharp/transform'
+import { formatSize, toArray } from '../utils/mixed'
 
 export default class Transform extends BaseCommand<typeof Transform> {
   static description = `Transform images.
@@ -26,6 +25,13 @@ export default class Transform extends BaseCommand<typeof Transform> {
     `<%= config.bin %> <%= command.id %> images/image-1.jpg -w 1000 --webp --avif --png --name-format='{name}@2x.{ext}'`,
     '<%= config.bin %> <%= command.id %> images/image-1.jpg --webp --name-remove=__raw',
   ]
+
+  static args = {
+    file: Args.string({
+      required: true,
+      description: 'Images to transform, maybe single file, dir or glob pattern',
+    }),
+  }
 
   static flags = {
     withEnlargement: Flags.boolean({
@@ -96,37 +102,84 @@ export default class Transform extends BaseCommand<typeof Transform> {
     }),
   }
 
-  static args = {
-    file: Args.file({ required: true, description: 'Image file to to transform' }),
-  }
-
   public async run(): Promise<void> {
-    const imageFile = cwdPath(this.args.file)
-
-    this.logger.info('Image:', imageFile)
-
     const profile = await this.getProfile()
+    const files = await this.getFiles(profile)
+
+    this.logger.info('Files', files)
+
+    if (!this.flags.watch) {
+      this.logger.start('Transforming...')
+
+      for await (const file of files) {
+        await this.runOne(file, profile)
+      }
+
+      this.logger.success('Transformed')
+    }
 
     if (this.flags.watch) {
-      this.logger.info('Watching file changes...')
-      await this.runWatch(imageFile, profile, this.flags.watchInitial)
-    } else {
-      await this.runOne(imageFile, profile)
+      this.logger.info('Watching file changes, press Ctrl+C to exit')
+      await this.runWatch(profile, this.flags.watchInitial)
     }
   }
 
-  async runWatch(imageFile: string, profile: SharpProfile, initial = false): Promise<void> {
+  async getFiles(profile: SharpProfile): Promise<string[]> {
+    const files = []
+
+    const sources = toArray(profile.source || '')
+
+    for await (const file of sources) {
+      files.push(...(await this.getFileFromSource(file)))
+    }
+
+    return files
+  }
+
+  async getFileFromSource(source: string): Promise<string[]> {
+    if (source.includes('*')) {
+      this.logger.info('Glob pattern detected')
+      return glob(source, {
+        cwd: process.cwd(),
+        nodir: true,
+      })
+    }
+
+    // is file
+    const isFileReg = /\.(\w+)$/
+    if (isFileReg.test(source)) {
+      this.logger.info('Single file detected')
+      return [source]
+    }
+
+    this.logger.info('Directory detected')
+    // is dir
+    // use glob to find all image Files
+    return glob(`${source}/**/*.{jpg,jpeg,png}`, {
+      nodir: true,
+      //      cwd: process.cwd(),
+    })
+  }
+
+  async runWatch(profile: SharpProfile, initial = false): Promise<void> {
     const chokidar = require('chokidar')
-    const watcher = chokidar.watch(imageFile, {
+    const watcher = chokidar.watch(profile.source!, {
       persistent: true,
       awaitWriteFinish: true,
+      ignore: '**/.*',
       ignoreInitial: !initial,
     })
 
-    watcher.on('change', async () => {
-      this.logger.info('File changed')
-      await this.runOne(imageFile, profile)
+    watcher.on('change', async (file: string) => {
+      this.logger.info('File changed: %s', file)
+      await this.runOne(file, profile)
     })
+    watcher.on('add', async (file: string) => {
+      this.logger.info('File added: %s', file)
+      await this.runOne(file, profile)
+    })
+
+    return watcher
   }
 
   runOne(imageFile: string, profile: SharpProfile): Promise<any> {
@@ -138,12 +191,17 @@ export default class Transform extends BaseCommand<typeof Transform> {
     const height = this.flags.height
 
     const profile: SharpProfile = {
+      source: this.args.file,
       transform: {
-        resize: {
-          width,
-          height,
-          withoutEnlargement: !this.flags.withEnlargement,
-        },
+        keepMeta: this.flags.keepMeta,
+        resize:
+          width || height
+            ? {
+                width,
+                height,
+                withoutEnlargement: !this.flags.withEnlargement,
+              }
+            : undefined,
       },
       export: {},
       output: {
@@ -175,7 +233,7 @@ export default class Transform extends BaseCommand<typeof Transform> {
   async transformFile(imageFile: string, profile: SharpProfile): Promise<OutputInfo[]> {
     const rawSharp = sharp(imageFile)
 
-    if (this.flags.keepMeta) {
+    if (profile.transform?.keepMeta) {
       rawSharp.withMetadata()
     }
 
@@ -192,10 +250,6 @@ export default class Transform extends BaseCommand<typeof Transform> {
     const limit = pLimit(1)
     const exportPromises = transform.export(imageFile).map((fn) => limit(fn))
 
-    this.logger.start('Transforming')
-    const result = await Promise.all(exportPromises)
-    this.logger.success('Transformed')
-
-    return result
+    return Promise.all(exportPromises)
   }
 }

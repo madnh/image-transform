@@ -1,7 +1,7 @@
 import { replace, replaceAll } from './mixed'
 
-const path = require('node:path')
 const fs = require('node:fs').promises
+const path = require('node:path')
 
 const cwd = process.cwd()
 

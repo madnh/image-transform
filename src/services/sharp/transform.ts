@@ -1,9 +1,13 @@
-import { changeName, ChangeNameResult } from '../../utils/paths'
+import fsExtra from 'fs-extra'
 import { AvifOptions, JpegOptions, OutputInfo, PngOptions, Sharp, WebpOptions } from 'sharp'
+
+import { formatSize } from '../../utils/mixed'
+import { changeName, ChangeNameResult } from '../../utils/paths'
+
 import { applyFns, avif, jpeg, png, SharpFn, webp } from './actions'
 import { SharpProfile } from './profile'
-import fsExtra from 'fs-extra'
-import { formatSize } from '../../utils/mixed'
+
+
 
 export type TapFunction<T extends any> = (sharp: Sharp) => T
 export type ExportFunction = () => Promise<OutputInfo>
