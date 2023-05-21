@@ -34,10 +34,10 @@ type PercentOptions = {
  */
 export function percent(base: number, value: number, options?: PercentOptions): string {
   const { char, sign } = options || { char: true, sign: false }
-  const result = Math.round((value / base) * 100)
+  const result = Math.round((value / base) * 100).toPrecision(2)
   const signChar = value < base ? '↓' : '↑'
 
-  return `${sign && signChar} ${result}${char ? '%' : ''}`.trim()
+  return `${sign ? signChar : ''} ${result}${char ? '%' : ''}`.trim()
 }
 
 /**

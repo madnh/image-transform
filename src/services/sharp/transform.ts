@@ -1,36 +1,38 @@
 import fsExtra from 'fs-extra'
-import { AvifOptions, JpegOptions, OutputInfo, PngOptions, Sharp, WebpOptions } from 'sharp'
+import { AvifOptions, JpegOptions, PngOptions, Sharp, WebpOptions } from 'sharp'
 
 import { formatSize } from '../../utils/mixed'
 import { changeName, ChangeNameResult } from '../../utils/paths'
 
 import { applyFns, avif, jpeg, png, SharpFn, webp } from './actions'
-import { SharpProfile } from './profile'
-
-
+import { TransformProfile } from './profile'
+import { TransformReport } from './report'
+import { TransformSource } from './types'
 
 export type TapFunction<T extends any> = (sharp: Sharp) => T
-export type ExportFunction = () => Promise<OutputInfo>
+export type ExportFunction = () => Promise<TransformReport>
 
 export default class Transform {
-  protected rawSharp: Sharp | null = null
-  protected result: Sharp | null = null
-  protected profile: SharpProfile
+  source: TransformSource
+  result: Sharp | null = null
+  profile: TransformProfile
 
-  constructor(profile: SharpProfile, rawSharp?: Sharp | null) {
+  constructor(profile: TransformProfile, source: TransformSource) {
     this.profile = profile
-
-    if (rawSharp) {
-      this.rawSharp = rawSharp
-    }
+    this.source = source
   }
 
   protected resetResult(): void {
     this.result = null
   }
 
-  withSharpSource(sharp: Sharp): this {
-    this.rawSharp = sharp
+  /**
+   * Change source, this will reset result if already transformed
+   * @param {TransformSource} source New source
+   * @returns {this}
+   */
+  useSource(source: TransformSource): this {
+    this.source = source
     this.resetResult()
 
     return this
@@ -54,13 +56,17 @@ export default class Transform {
     return fns
   }
 
+  get rawSharp(): Sharp {
+    if (!this.source.sharp) {
+      throw new Error('Source sharp is null')
+    }
+
+    return this.source.sharp
+  }
+
   transform(): Sharp {
     if (this.result) {
       return this.result
-    }
-
-    if (!this.rawSharp) {
-      throw new Error('No sharp instance')
     }
 
     const fns: SharpFn[] = this.transformFns
@@ -95,16 +101,15 @@ export default class Transform {
     return exportFns
   }
 
-  createExportFn(exporter: SharpFn, rawFile: string, newFileExt: string): () => Promise<OutputInfo> {
-    return async (): Promise<OutputInfo> => {
+  createExportFn(exporter: SharpFn, rawFile: string, newFileExt: string): () => Promise<TransformReport> {
+    return async (): Promise<TransformReport> => {
       const newFile = this.exportTarget(rawFile, newFileExt)
       const sharp = this.tap(exporter)
       await fsExtra.ensureDir(newFile.dir)
 
-      const result = await sharp.toFile(newFile.file)
+      const exportResult = await sharp.toFile(newFile.file)
 
-      console.log(`Exported ${newFile.file} \t\t ${result.width}x${result.height} \t ${formatSize(result.size)}`)
-      return result
+      return new TransformReport(this, exportResult, newFile)
     }
   }
 

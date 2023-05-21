@@ -1,12 +1,17 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
+
 import { Args, Flags } from '@oclif/core'
 import { glob } from 'glob'
 import pLimit from 'p-limit'
-import sharp, { OutputInfo } from 'sharp'
+import PQueue from 'p-queue'
+import sharp from 'sharp'
 
 import { BaseCommand } from '../base-command'
-import { SharpProfile } from '../services/sharp/profile'
+import { TransformProfile } from '../services/sharp/profile'
 import SharpTransform from '../services/sharp/transform'
-import { formatSize, toArray } from '../utils/mixed'
+import { TransformSource } from '../services/sharp/types'
+import { formatSize, percent, toArray } from '../utils/mixed'
 
 export default class Transform extends BaseCommand<typeof Transform> {
   static description = `Transform images.
@@ -100,6 +105,25 @@ export default class Transform extends BaseCommand<typeof Transform> {
       description: 'Watch file changes, and run initial transform for current file',
       aliases: ['watch-initial'],
     }),
+
+    concurrency: Flags.integer({
+      default: 3,
+      description: 'Number of concurrent transform',
+    }),
+  }
+
+  protected queue!: PQueue
+
+  async init(): Promise<void> {
+    await super.init()
+
+    this.logger.debug('Init....')
+
+    this.queue = new PQueue({
+      concurrency: this.flags.concurrency,
+    })
+
+    this.logger.debug('Init completed')
   }
 
   public async run(): Promise<void> {
@@ -111,23 +135,30 @@ export default class Transform extends BaseCommand<typeof Transform> {
       this.logger.info('Found %d file(s)', files.length)
     }
 
+    // Run one on each files
+    // ---------------------------------
     if (!this.flags.watch) {
       this.logger.start('Transforming...')
 
-      for await (const file of files) {
-        await this.runOne(file, profile)
+      for (const file of files) {
+        this.queue.add(() => this.transformFile(file, profile))
       }
 
+      await this.queue.onIdle()
+
       this.logger.success('Transformed')
+      this.exit(0)
     }
 
+    // Run in watch mode
+    // ---------------------------------
     if (this.flags.watch) {
       this.logger.info('Watching file changes, press Ctrl+C to exit')
       await this.runWatch(profile, this.flags.watchInitial)
     }
   }
 
-  async getFiles(profile: SharpProfile): Promise<string[]> {
+  async getFiles(profile: TransformProfile): Promise<string[]> {
     const files = []
 
     const sources = toArray(profile.source || '')
@@ -163,7 +194,7 @@ export default class Transform extends BaseCommand<typeof Transform> {
     })
   }
 
-  async runWatch(profile: SharpProfile, initial = false): Promise<void> {
+  async runWatch(profile: TransformProfile, initial = false): Promise<void> {
     const chokidar = require('chokidar')
     const watcher = chokidar.watch(profile.source!, {
       persistent: true,
@@ -174,12 +205,12 @@ export default class Transform extends BaseCommand<typeof Transform> {
 
     watcher.on('add', async (file: string) => {
       this.logger.info('File added: %s', file)
-      await this.transformFile(file, profile)
+      this.queue.add(() => this.transformFile(file, profile))
     })
 
     watcher.on('change', async (file: string) => {
       this.logger.info('File changed: %s', file)
-      await this.transformFile(file, profile)
+      this.queue.add(() => this.transformFile(file, profile))
     })
 
     watcher.on('unlink', async (file: string) => {
@@ -189,15 +220,15 @@ export default class Transform extends BaseCommand<typeof Transform> {
     return watcher
   }
 
-  runOne(imageFile: string, profile: SharpProfile): Promise<any> {
+  runOne(imageFile: string, profile: TransformProfile): Promise<any> {
     return this.transformFile(imageFile, profile)
   }
 
-  async getProfile(): Promise<SharpProfile> {
+  async getProfile(): Promise<TransformProfile> {
     const width = this.flags.width
     const height = this.flags.height
 
-    const profile: SharpProfile = {
+    const profile: TransformProfile = {
       source: this.args.file,
       transform: {
         keepMeta: this.flags.keepMeta,
@@ -237,26 +268,52 @@ export default class Transform extends BaseCommand<typeof Transform> {
     return profile
   }
 
-  async transformFile(imageFile: string, profile: SharpProfile): Promise<OutputInfo[]> {
+  async transformFile(imageFile: string, profile: TransformProfile): Promise<void> {
+    const file = await fs.open(imageFile, 'r')
+    const stat = await file.stat()
+    await file.close()
+
+    if (!stat.isFile()) {
+      this.logger.warn('Skip non file: %s', imageFile)
+      return
+    }
+
     const rawSharp = sharp(imageFile)
+    const meta = await rawSharp.metadata()
+
+    const source: TransformSource = {
+      type: 'file',
+      sharp: rawSharp,
+      meta: meta,
+      info: {
+        file: imageFile,
+        fileExt: path.extname(imageFile).slice(1),
+        width: meta.width,
+        height: meta.height,
+        size: stat.size,
+        stat: stat,
+      },
+    }
 
     if (profile.transform?.keepMeta) {
       rawSharp.withMetadata()
     }
 
-    const meta = await rawSharp.metadata()
-    this.logger.info(' - Format:', meta.format)
-    this.logger.info(' - Width:', meta.width)
-    this.logger.info(' - Height:', meta.height)
-    if (meta.size !== undefined) {
-      this.logger.info(' - Size:', formatSize(meta.size))
+    const rawFileFormattedSize = formatSize(stat.size)
+    this.logger.debug(`Transforming ${imageFile} ${meta.format} ${meta.width}x${meta.height} ${rawFileFormattedSize}`)
+
+    const transform = new SharpTransform(profile, source)
+    const limit = pLimit(2)
+    const jobs = transform.export(imageFile).map((fn) => limit(fn))
+
+    const allResults = await Promise.all(jobs)
+    for (const result of allResults) {
+      const percentStr = percent(stat.size, result.output.size, { sign: false, char: true })
+
+      const formattedNewSize = formatSize(result.output.size)
+      this.logger.success(
+        `${result.newFile.file}     ${result.output.width}x${result.output.height}     ${formattedNewSize} / ${rawFileFormattedSize}    ${percentStr}`
+      )
     }
-
-    const transform = new SharpTransform(profile, rawSharp)
-
-    const limit = pLimit(1)
-    const exportPromises = transform.export(imageFile).map((fn) => limit(fn))
-
-    return Promise.all(exportPromises)
   }
 }

@@ -1,6 +1,6 @@
 import { AvifOptions, JpegOptions, PngOptions, ResizeOptions, WebpOptions } from 'sharp'
 
-export type SharpProfile = {
+export type TransformProfile = {
   name?: string
   /**
    * File or files to transform:
