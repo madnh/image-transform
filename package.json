@@ -1,5 +1,5 @@
 {
-  "name": "image-transform",
+  "name": "@madnh/image-transform",
   "version": "0.0.0",
   "description": "Transform your images",
   "author": "MaDnh",
@@ -11,10 +11,10 @@
   "main": "dist/index.js",
   "repository": "madnh/image-transform",
   "files": [
-    "/bin",
-    "/dist",
-    "/npm-shrinkwrap.json",
-    "/oclif.manifest.json"
+    "bin",
+    "dist",
+    "npm-shrinkwrap.json",
+    "oclif.manifest.json"
   ],
   "dependencies": {
     "@oclif/core": "^2",
@@ -63,15 +63,10 @@
     ],
     "commands": "./dist/commands",
     "plugins": [
-      "@oclif/plugin-help",
-      "@oclif/plugin-plugins"
+      "@oclif/plugin-help"
     ],
     "topicSeparator": " ",
-    "topics": {
-      "hello": {
-        "description": "Say hello to the world and others"
-      }
-    }
+    "topics": {}
   },
   "scripts": {
     "build": "shx rm -rf dist && tsc -b",
