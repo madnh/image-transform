@@ -11,11 +11,11 @@ CLI to help you to transform your images.
 # Usage
 <!-- usage -->
 ```sh-session
-$ npm install -g image-transform
+$ npm install -g @madnh/image-transform
 $ image-transform COMMAND
 running command...
 $ image-transform (--version|--version|-v)
-image-transform/0.0.0 darwin-x64 node-v18.16.0
+@madnh/image-transform/0.0.1 darwin-x64 node-v18.16.0
 $ image-transform --help [COMMAND]
 USAGE
   $ image-transform COMMAND
@@ -98,5 +98,5 @@ EXAMPLES
   $ image-transform transform images/image-1.jpg --webp --name-remove=__raw
 ```
 
-_See code: [dist/commands/transform.ts](https://github.com/madnh/image-transform/blob/v0.0.0/dist/commands/transform.ts)_
+_See code: [dist/commands/transform.ts](https://github.com/madnh/image-transform/blob/v0.0.1/dist/commands/transform.ts)_
 <!-- commandsstop -->

@@ -1,6 +1,6 @@
 {
   "name": "@madnh/image-transform",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Transform your images",
   "author": "MaDnh",
   "bin": {
