@@ -58,6 +58,7 @@ export function changeName(file: string, options: ChangeNameOptions): ChangeName
   const currentExt = path.extname(file) // extenstion with dot, e.g. .jpg, .png
   const orgExt = currentExt.slice(1) // remove dot
   const currentName = path.basename(file, currentExt) // file name without extension
+  const currentNameWithExt = path.basename(file)
   const currentDir = path.dirname(file) // directory of file
 
   const cleanupCurrentName = options.replace ? replaceAll(currentName, options.replace) : currentName
@@ -78,6 +79,7 @@ export function changeName(file: string, options: ChangeNameOptions): ChangeName
     ext: newExt,
     orgExt,
     orgName: cleanupCurrentName,
+    orgNameExt: currentNameWithExt,
   })
 
   const safeFilename = cleanupFilename(rawFilename)

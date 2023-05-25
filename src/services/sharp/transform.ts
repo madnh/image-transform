@@ -1,13 +1,13 @@
 import fsExtra from 'fs-extra'
+import pPipe from 'p-pipe'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { AvifOptions, JpegOptions, PngOptions, Sharp, WebpOptions } from 'sharp'
 
-import { formatSize } from '../../utils/mixed'
 import { changeName, ChangeNameResult } from '../../utils/paths'
 
-import { applyFns, avif, jpeg, png, SharpFn, webp } from './actions'
-import { TransformProfile } from './profile'
+import actions from './actions'
 import { TransformReport } from './report'
-import { TransformSource } from './types'
+import { SharpFn, TransformAction, TransformProfile, TransformSource } from './types'
 
 export type TapFunction<T extends any> = (sharp: Sharp) => T
 export type ExportFunction = () => Promise<TransformReport>
@@ -16,10 +16,13 @@ export default class Transform {
   source: TransformSource
   result: Sharp | null = null
   profile: TransformProfile
+  transformAction: TransformAction | null = null
 
-  constructor(profile: TransformProfile, source: TransformSource) {
+  constructor(profile: TransformProfile, source: TransformSource, transformAction?: TransformAction) {
     this.profile = profile
     this.source = source
+
+    this.transformAction = transformAction || null
   }
 
   protected resetResult(): void {
@@ -43,14 +46,17 @@ export default class Transform {
   }
 
   get transformFns(): SharpFn[] {
+    if (!this.transformAction) return []
+
     const fns: SharpFn[] = []
-    const { resize, rotate } = this.profile.transform || {}
+
+    const { resize, rotate } = this.transformAction
     if (resize) {
-      fns.push((sharp) => sharp.resize(resize))
+      fns.push((sharp) => actions.resize(sharp, resize))
     }
 
     if (rotate) {
-      fns.push((sharp) => sharp.rotate(rotate))
+      fns.push((sharp) => actions.rotate(sharp, rotate))
     }
 
     return fns
@@ -64,14 +70,27 @@ export default class Transform {
     return this.source.sharp
   }
 
-  transform(): Sharp {
+  async transform(): Promise<Sharp> {
     if (this.result) {
       return this.result
     }
 
     const fns: SharpFn[] = this.transformFns
+    if (fns.length > 0) {
+      const sharp = this.rawSharp.clone()
 
-    this.result = fns.length > 0 ? applyFns(this.rawSharp.clone(), fns) : this.rawSharp.clone()
+      if (this.transformAction?.keepMeta) {
+        sharp.withMetadata()
+      }
+
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      const pipeline = pPipe<Sharp, Sharp>(...fns)
+      this.result = await pipeline(sharp.clone())!
+    } else {
+      this.result = this.rawSharp.clone()
+    }
+
     return this.result
   }
 
@@ -80,22 +99,22 @@ export default class Transform {
 
     if (this.profile.export.jpeg) {
       const options: JpegOptions = this.profile.export.jpeg === true ? {} : this.profile.export.jpeg
-      exportFns.push(this.createExportFn(jpeg(options), rawFile, 'jpg'))
+      exportFns.push(this.createExportFn((s) => Promise.resolve(s.jpeg(options)), rawFile, 'jpg'))
     }
 
     if (this.profile.export.png) {
       const options: PngOptions = this.profile.export.png === true ? {} : this.profile.export.png
-      exportFns.push(this.createExportFn(png(options), rawFile, 'png'))
+      exportFns.push(this.createExportFn((s) => Promise.resolve(s.png(options)), rawFile, 'png'))
     }
 
     if (this.profile.export.webp) {
       const options: WebpOptions = this.profile.export.webp === true ? {} : this.profile.export.webp
-      exportFns.push(this.createExportFn(webp(options), rawFile, 'webp'))
+      exportFns.push(this.createExportFn((s) => Promise.resolve(s.webp(options)), rawFile, 'webp'))
     }
 
     if (this.profile.export.avif) {
       const options: AvifOptions = this.profile.export.avif === true ? {} : this.profile.export.avif
-      exportFns.push(this.createExportFn(avif(options), rawFile, 'avif'))
+      exportFns.push(this.createExportFn((s) => Promise.resolve(s.avif(options)), rawFile, 'avif'))
     }
 
     return exportFns
@@ -104,7 +123,8 @@ export default class Transform {
   createExportFn(exporter: SharpFn, rawFile: string, newFileExt: string): () => Promise<TransformReport> {
     return async (): Promise<TransformReport> => {
       const newFile = this.exportTarget(rawFile, newFileExt)
-      const sharp = this.tap(exporter)
+      const sharp = await this.tap(exporter)
+
       await fsExtra.ensureDir(newFile.dir)
 
       const exportResult = await sharp.toFile(newFile.file)
@@ -130,9 +150,9 @@ export default class Transform {
     return fn(this.rawSharp.clone())
   }
 
-  tap<T extends any>(fn: TapFunction<T>): T {
+  async tap<T extends any>(fn: TapFunction<T>): Promise<T> {
     if (!this.result) {
-      this.transform()
+      await this.transform()
     }
 
     return fn(this.result!.clone())

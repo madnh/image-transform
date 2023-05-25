@@ -1,3 +1,4 @@
+import pPipe from 'p-pipe'
 import prettyBytes from 'pretty-bytes'
 
 export function formatSize(size: number): string {
@@ -34,7 +35,8 @@ type PercentOptions = {
  */
 export function percent(base: number, value: number, options?: PercentOptions): string {
   const { char, sign } = options || { char: true, sign: false }
-  const result = Math.round((value / base) * 100).toPrecision(2)
+  const result =
+    value < base ? Math.round((value / base) * 100).toPrecision(2) : Math.round((base / value) * 100).toPrecision(2)
   const signChar = value < base ? '↓' : '↑'
 
   return `${sign ? signChar : ''} ${result}${char ? '%' : ''}`.trim()

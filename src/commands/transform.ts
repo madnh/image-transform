@@ -8,9 +8,8 @@ import PQueue from 'p-queue'
 import sharp from 'sharp'
 
 import { BaseCommand } from '../base-command'
-import { TransformProfile } from '../services/sharp/profile'
 import SharpTransform from '../services/sharp/transform'
-import { TransformSource } from '../services/sharp/types'
+import { TransformAction, TransformProfile, TransformSource } from '../services/sharp/types'
 import { formatSize, percent, toArray } from '../utils/mixed'
 
 export default class Transform extends BaseCommand<typeof Transform> {
@@ -107,19 +106,20 @@ export default class Transform extends BaseCommand<typeof Transform> {
     }),
 
     concurrency: Flags.integer({
-      default: 3,
+      default: 1,
       description: 'Number of concurrent transform',
     }),
   }
 
-  protected queue!: PQueue
+  protected sourceFileHandleQueue!: PQueue
+  protected fileHandleQueue!: PQueue
 
   async init(): Promise<void> {
     await super.init()
 
     this.logger.debug('Init....')
 
-    this.queue = new PQueue({
+    this.sourceFileHandleQueue = new PQueue({
       concurrency: this.flags.concurrency,
     })
 
@@ -141,10 +141,10 @@ export default class Transform extends BaseCommand<typeof Transform> {
       this.logger.start('Transforming...')
 
       for (const file of files) {
-        this.queue.add(() => this.transformFile(file, profile))
+        this.sourceFileHandleQueue.add(() => this.transformFile(file, profile))
       }
 
-      await this.queue.onIdle()
+      await this.sourceFileHandleQueue.onIdle()
 
       this.logger.success('Transformed')
       this.exit(0)
@@ -205,12 +205,12 @@ export default class Transform extends BaseCommand<typeof Transform> {
 
     watcher.on('add', async (file: string) => {
       this.logger.info('File added: %s', file)
-      this.queue.add(() => this.transformFile(file, profile))
+      this.sourceFileHandleQueue.add(() => this.transformFile(file, profile))
     })
 
     watcher.on('change', async (file: string) => {
       this.logger.info('File changed: %s', file)
-      this.queue.add(() => this.transformFile(file, profile))
+      this.sourceFileHandleQueue.add(() => this.transformFile(file, profile))
     })
 
     watcher.on('unlink', async (file: string) => {
@@ -282,7 +282,6 @@ export default class Transform extends BaseCommand<typeof Transform> {
     const meta = await rawSharp.metadata()
 
     const source: TransformSource = {
-      type: 'file',
       sharp: rawSharp,
       meta: meta,
       info: {
@@ -295,25 +294,45 @@ export default class Transform extends BaseCommand<typeof Transform> {
       },
     }
 
-    if (profile.transform?.keepMeta) {
-      rawSharp.withMetadata()
-    }
-
     const rawFileFormattedSize = formatSize(stat.size)
-    this.logger.debug(`Transforming ${imageFile} ${meta.format} ${meta.width}x${meta.height} ${rawFileFormattedSize}`)
+    this.logger.info(`Transforming ${imageFile} ${meta.format} ${meta.width}x${meta.height} ${rawFileFormattedSize}`)
 
-    const transform = new SharpTransform(profile, source)
-    const limit = pLimit(2)
-    const jobs = transform.export(imageFile).map((fn) => limit(fn))
+    if (profile.transform) {
+      for await (const transformAction of toArray(profile.transform)) {
+        await this.doTransform(profile, source, transformAction)
+      }
+    } else {
+      await this.doTransform(profile, source)
+    }
+  }
+
+  async doTransform(
+    profile: TransformProfile,
+    source: TransformSource,
+    transformAction?: TransformAction
+  ): Promise<void> {
+    const transform = new SharpTransform(profile, source, transformAction)
+    const stat = source.info.stat!
+    const rawFileFormattedSize = formatSize(stat.size)
+    const limit = pLimit(1)
+    const jobs = transform.export(source.info.file).map((fn) => limit(fn).catch((error) => this.logger.error(error)))
 
     const allResults = await Promise.all(jobs)
-    for (const result of allResults) {
-      const percentStr = percent(stat.size, result.output.size, { sign: false, char: true })
+    for (const result of allResults)
+      if (result) {
+        const percentStr = percent(stat.size, result.output.size, { sign: false, char: true })
 
-      const formattedNewSize = formatSize(result.output.size)
-      this.logger.success(
-        `${result.newFile.file}     ${result.output.width}x${result.output.height}     ${formattedNewSize} / ${rawFileFormattedSize}    ${percentStr}`
-      )
-    }
+        const formattedNewSize = formatSize(result.output.size)
+        const isOverSize = result.output.size > stat.size
+        const message = `${result.newFile.file}     ${result.output.width}x${
+          result.output.height
+        }     ${formattedNewSize} / ${rawFileFormattedSize}    ${percentStr} ${isOverSize ? '↑' : '↓'}`
+
+        if (isOverSize) {
+          this.logger.warn(message)
+        } else {
+          this.logger.success(message)
+        }
+      }
   }
 }
