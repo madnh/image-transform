@@ -1,8 +1,9 @@
 import { Stats } from 'node:fs'
 
-import { Sharp, Metadata, ResizeOptions, JpegOptions, AvifOptions, PngOptions, WebpOptions } from 'sharp'
+import { Sharp, Metadata, JpegOptions, AvifOptions, PngOptions, WebpOptions } from 'sharp'
 
-import { RorateFnOptions } from './actions/rotate'
+import { ResizeActionOptions } from './actions/resize'
+import { RorateActionOptions } from './actions/rotate'
 
 export type TransformSource = {
   sharp: Sharp | null
@@ -20,8 +21,8 @@ export type TransformSource = {
 export type TransformAction = {
   name?: string
   keepMeta?: boolean
-  resize?: ResizeOptions
-  rotate?: RorateFnOptions
+  resize?: ResizeActionOptions
+  rotate?: RorateActionOptions
 }
 
 export type TransformProfile = {

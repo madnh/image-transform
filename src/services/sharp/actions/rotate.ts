@@ -1,9 +1,9 @@
 import { RotateOptions, Sharp } from 'sharp'
 
-export type RorateFnOptions = {
+export type RorateActionOptions = {
   angle: number
   options?: RotateOptions
 }
-export default async function rotate(sharp: Sharp, options: RorateFnOptions): Promise<Sharp> {
+export default async function rotate(sharp: Sharp, options: RorateActionOptions): Promise<Sharp> {
   return sharp.rotate(options.angle, options.options)
 }
