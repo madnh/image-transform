@@ -1,6 +1,6 @@
 import { OutputInfo } from 'sharp'
 
-import { ChangeNameResult } from '@/src/utils/paths'
+import { ChangeNameResult } from '../../utils/paths'
 
 import Transform from './transform'
 

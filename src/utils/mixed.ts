@@ -1,4 +1,3 @@
-import pPipe from 'p-pipe'
 import prettyBytes from 'pretty-bytes'
 
 export function formatSize(size: number): string {
@@ -89,7 +88,7 @@ export function replace(
 }
 
 export function replaceAll(text: string, replaceMap: Record<string, string>): string {
-  return Object.entries(replaceMap).reduce((result, [key, value]) => {
+  return [...Object.entries(replaceMap)].reduce((result, [key, value]) => {
     return result.replace(new RegExp(key, 'g'), value)
   }, text)
 }
