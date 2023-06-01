@@ -6,3 +6,8 @@ dist
 tmp
 node_modules
 oclif.manifest.json
+
+example/*
+!example/image-transform.config.json
+!example/static/apple-touch-icon-raw.png
+!example/assets/image.jpg

@@ -1,0 +1,34 @@
+{
+  "$schema": "../schema.json",
+  "version": 1,
+  "profiles": [
+    {
+      "name": "modern",
+      "description": "Converts JPG/JPEG/PNG files to Webp and Avif",
+      "source": "assets/**/*.{jpg,jpeg,png}",
+      "export": {
+        "webp": true,
+        "avif": true
+      }
+    },
+    {
+      "name": "apple-icons",
+      "description": "Create Apple Touch Icons",
+      "source": "static/apple-touch-icon-raw.png",
+      "transforms": [
+        { "label": "1024", "resize": { "width": 1024, "height": 1024 } },
+        { "label": "512", "resize": { "width": 512, "height": 512 } },
+        { "label": "256", "resize": { "width": 256, "height": 256 } },
+        { "label": "180", "resize": { "width": 180, "height": 180 } },
+        { "label": "64", "resize": { "width": 64, "height": 64 } },
+        { "label": "32", "resize": { "width": 32, "height": 32 } }
+      ],
+      "export": {
+        "png": true
+      },
+      "output": {
+        "fileNameFormat": "apple-touch-icon-{label}"
+      }
+    }
+  ]
+}
