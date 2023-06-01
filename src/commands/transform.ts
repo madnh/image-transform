@@ -2,14 +2,16 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import { Args, Flags } from '@oclif/core'
+import fsExtra from 'fs-extra'
 import { glob } from 'glob'
 import pLimit from 'p-limit'
 import PQueue from 'p-queue'
 import sharp from 'sharp'
 
 import { BaseCommand } from '../base-command'
+import { configSchema, profileSchema } from '../services/sharp/schemas'
 import SharpTransform from '../services/sharp/transform'
-import { TransformAction, TransformProfile, TransformSource } from '../services/sharp/types'
+import { TransformAction, TransformConfig, TransformProfile, TransformSource } from '../services/sharp/types'
 import { formatSize, percent, toArray } from '../utils/mixed'
 
 export default class Transform extends BaseCommand<typeof Transform> {
@@ -23,6 +25,8 @@ export default class Transform extends BaseCommand<typeof Transform> {
 `
 
   static examples = [
+    '<%= config.bin %> <%= command.id %> --profile apple-icons',
+    '<%= config.bin %> <%= command.id %> --profile apple-icons --config images-transform.json',
     '<%= config.bin %> <%= command.id %> images/image-1.jpg --webp',
     '<%= config.bin %> <%= command.id %> images/image-1.jpg --webp --width 500 --out images/optimized',
     '<%= config.bin %> <%= command.id %> images/image-1.jpg --avif --png --height=300',
@@ -32,12 +36,22 @@ export default class Transform extends BaseCommand<typeof Transform> {
 
   static args = {
     file: Args.string({
-      required: true,
-      description: 'Images to transform, maybe single file, dir or glob pattern',
+      required: false,
+      description: 'Images to transform, maybe single file, dir or glob pattern. Can ignore if use `--profile`',
     }),
   }
 
   static flags = {
+    configFile: Flags.string({
+      char: 'c',
+      description: 'Config file path',
+      default: 'image-transform.config.json',
+      aliases: ['config-file'],
+    }),
+    profile: Flags.string({
+      char: 'p',
+      description: 'Profile name',
+    }),
     withEnlargement: Flags.boolean({
       default: false,
       aliases: ['with-enlargement'],
@@ -127,10 +141,17 @@ export default class Transform extends BaseCommand<typeof Transform> {
   }
 
   public async run(): Promise<void> {
+    if (!this.flags.profile && !this.args.file) {
+      this.logger.error('Please provide profile name or file path')
+      this.exit(1)
+    }
+
     const profile = await this.getProfile()
     const files = await this.getFiles(profile)
 
+    this.logger.debug('Profile', profile)
     this.logger.debug('Files', files)
+
     if (!this.flags.watch) {
       this.logger.info('Found %d file(s)', files.length)
     }
@@ -171,7 +192,8 @@ export default class Transform extends BaseCommand<typeof Transform> {
   }
 
   async getFileFromSource(source: string): Promise<string[]> {
-    if (source.includes('*')) {
+    this.logger.info('source', source)
+    if (source.includes('*') || source.includes('?') || source.includes('{')) {
       this.logger.debug('Glob pattern detected')
       return glob(source, {
         nodir: true,
@@ -224,23 +246,63 @@ export default class Transform extends BaseCommand<typeof Transform> {
     return this.transformFile(imageFile, profile)
   }
 
+  async loadConfig(configFile: string): Promise<TransformConfig> {
+    const configFilePath = path.resolve(configFile)
+
+    if (!(await fsExtra.pathExists(configFilePath))) {
+      this.logger.error(`Config file not found: ${configFilePath}`)
+      this.exit(1)
+    }
+
+    const config = await fsExtra.readJSON(configFilePath)
+    const validateResult = configSchema.safeParse(config)
+    if (validateResult.success) {
+      return validateResult.data
+    }
+
+    this.logger.error(`Config file is invalid: ${validateResult.error.message}`)
+
+    this.exit(1)
+
+    return undefined as unknown as TransformConfig
+  }
+
+  async getProfileFromConfig(profile: string): Promise<TransformProfile> {
+    const config = await this.loadConfig(this.flags.configFile)
+    const foundProfile = config.profiles.find((p) => p.name === profile)
+
+    if (!foundProfile) {
+      this.logger.error(`Profile not defined: ${profile}`)
+      this.exit(1)
+    }
+
+    return foundProfile!
+  }
+
   async getProfile(): Promise<TransformProfile> {
+    if (this.flags.profile) {
+      return this.getProfileFromConfig(this.flags.profile)
+    }
+
     const width = this.flags.width
     const height = this.flags.height
 
     const profile: TransformProfile = {
+      name: 'cli',
       source: this.args.file,
-      transform: {
-        keepMeta: this.flags.keepMeta,
-        resize:
-          width || height
-            ? {
-                width,
-                height,
-                withoutEnlargement: !this.flags.withEnlargement,
-              }
-            : undefined,
-      },
+      transforms: [
+        {
+          keepMeta: this.flags.keepMeta,
+          resize:
+            width || height
+              ? {
+                  width,
+                  height,
+                  withoutEnlargement: !this.flags.withEnlargement,
+                }
+              : undefined,
+        },
+      ],
       export: {},
       output: {
         dir: this.flags.out,
@@ -263,6 +325,12 @@ export default class Transform extends BaseCommand<typeof Transform> {
 
     if (this.flags.avif) {
       profile.export.avif = true
+    }
+
+    const validateProfileResult = profileSchema.safeParse(profile)
+    if (!validateProfileResult.success) {
+      this.logger.error(`Profile is invalid: ${validateProfileResult.error.message}`)
+      this.exit(1)
     }
 
     return profile
@@ -297,8 +365,8 @@ export default class Transform extends BaseCommand<typeof Transform> {
     const rawFileFormattedSize = formatSize(stat.size)
     this.logger.info(`Transforming ${imageFile} ${meta.format} ${meta.width}x${meta.height} ${rawFileFormattedSize}`)
 
-    if (profile.transform) {
-      for await (const transformAction of toArray(profile.transform)) {
+    if (profile.transforms) {
+      for await (const transformAction of toArray(profile.transforms)) {
         await this.doTransform(profile, source, transformAction)
       }
     } else {
@@ -324,9 +392,16 @@ export default class Transform extends BaseCommand<typeof Transform> {
 
         const formattedNewSize = formatSize(result.output.size)
         const isOverSize = result.output.size > stat.size
-        const message = `${result.newFile.file}     ${result.output.width}x${
-          result.output.height
-        }     ${formattedNewSize} / ${rawFileFormattedSize}    ${percentStr} ${isOverSize ? '↑' : '↓'}`
+
+        const message = [
+          transformAction?.label ? `[ ${transformAction.label} ]` : '',
+          result.newFile.file,
+          `${result.output.width}x${result.output.height}`,
+          `${formattedNewSize} / ${rawFileFormattedSize}`,
+          `${percentStr} ${isOverSize ? '↑' : '↓'}`,
+        ]
+          .filter(Boolean)
+          .join('   ')
 
         if (isOverSize) {
           this.logger.warn(message)

@@ -19,14 +19,14 @@ export type TransformSource = {
 }
 
 export type TransformAction = {
-  name?: string
+  label?: string
   keepMeta?: boolean
   resize?: ResizeActionOptions
   rotate?: RorateActionOptions
 }
 
 export type TransformProfile = {
-  name?: string
+  name: string
   /**
    * File or files to transform:
    * - file path: specified image file, example: image/1.jpg
@@ -36,7 +36,7 @@ export type TransformProfile = {
    *   + images/raw/**\/*.{jpg,png}   // all jpg and png files in images/raw/, include sub directories
    */
   source?: string | string[]
-  transform?: TransformAction | TransformAction[]
+  transforms?: TransformAction | TransformAction[]
   export: {
     jpeg?: JpegOptions | true
     png?: PngOptions | true
@@ -51,6 +51,7 @@ export type TransformProfile = {
      *   {orgName} - original file name
      *   {orgExt} - original file extension
      *   {orgNameExt} - original file name with extension
+     *   {label} - transform label
      */
     fileNameFormat?: string
 
@@ -58,6 +59,12 @@ export type TransformProfile = {
     fileNameReplace?: Record<string, string>
     dir?: string
   }
+}
+
+export type TransformConfig = {
+  $shema?: string
+  version: number
+  profiles: TransformProfile[]
 }
 
 export type SharpHandler<O extends any> = (sharp: Sharp, options: O) => Promise<Sharp>

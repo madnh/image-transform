@@ -2,7 +2,7 @@ import { AnimationOptions, OutputOptions } from 'sharp'
 import { z, ZodType } from 'zod'
 
 import { ResizeActionOptions } from './actions/resize'
-import { TransformAction, TransformProfile } from './types'
+import { TransformAction, TransformConfig, TransformProfile } from './types'
 
 export const transformActionResizeSchema = z.object({
   width: z.number().optional(),
@@ -39,8 +39,8 @@ export const transformActionRotateSchema = z.object({
     .optional(),
 }) satisfies ZodType<TransformAction['rotate']>
 
-export const TransformActionSchema = z.object({
-  name: z.string().optional(),
+export const transformActionSchema = z.object({
+  label: z.string().optional(),
   keepMeta: z.boolean().optional(),
   resize: transformActionResizeSchema.optional(),
   rotate: transformActionRotateSchema.optional(),
@@ -108,10 +108,10 @@ export const exportAvifOptionsSchema = sharpOutputOptionsSchema.merge(
   })
 ) satisfies ZodType<TransformProfile['export']['avif']>
 
-export const ProfileSchema = z.object({
-  name: z.string().optional(),
+export const profileSchema = z.object({
+  name: z.string(),
   source: z.union([z.string(), z.array(z.string())]).optional(),
-  transform: z.union([TransformActionSchema, z.array(TransformActionSchema)]).optional(),
+  transforms: z.union([transformActionSchema, z.array(transformActionSchema)]).optional(),
 
   export: z.object({
     jpeg: z.union([exportJpegOptionsSchema, z.literal(true)]).optional(),
@@ -127,3 +127,9 @@ export const ProfileSchema = z.object({
     })
     .optional(),
 }) satisfies ZodType<TransformProfile>
+
+export const configSchema = z.object({
+  $schema: z.string().optional(),
+  version: z.number().int(),
+  profiles: z.array(profileSchema).min(1),
+}) satisfies ZodType<TransformConfig>

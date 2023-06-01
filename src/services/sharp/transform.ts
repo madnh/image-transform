@@ -77,10 +77,10 @@ export default class Transform {
 
     const fns: SharpFn[] = this.transformFns
     if (fns.length > 0) {
-      const sharp = this.rawSharp.clone()
+      let sharp = this.rawSharp.clone()
 
       if (this.transformAction?.keepMeta) {
-        sharp.withMetadata()
+        sharp = sharp.withMetadata()
       }
 
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -139,6 +139,11 @@ export default class Transform {
       dir: this.profile.output?.dir,
       format: this.profile.output?.fileNameFormat,
       replace: this.profile.output?.fileNameReplace,
+      formatData: {
+        width: String(this.transformAction?.resize?.width) || '',
+        height: String(this.transformAction?.resize?.height) || '',
+        label: this.transformAction?.label || '',
+      },
     })
   }
 
