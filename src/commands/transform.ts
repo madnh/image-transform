@@ -122,6 +122,20 @@ export default class Transform extends BaseCommand<typeof Transform> {
     concurrency: Flags.integer({
       default: 1,
       description: 'Number of concurrent transform',
+      min: 1,
+      max: 10,
+    }),
+    data: Flags.string({
+      char: 'd',
+      description:
+        'Data to pass to filename format, can be multiple, informat of `key=value`, example: `--data name=abc --data age=20`',
+      multiple: true,
+    }),
+    quality: Flags.integer({
+      description: `Quality of output image, override defined value in profile.
+        Useful to reduce file size manually, use with "--data" flag to add versioning, example: "--quality 80 --data version=1"`,
+      min: 1,
+      max: 100,
     }),
   }
 
@@ -141,6 +155,8 @@ export default class Transform extends BaseCommand<typeof Transform> {
   }
 
   public async run(): Promise<void> {
+    this.logger.debug('Flag - fileNameData', this.getFileNameData())
+
     if (!this.flags.profile && !this.args.file) {
       this.logger.error('Please provide profile name or file path')
       this.exit(1)
@@ -177,6 +193,25 @@ export default class Transform extends BaseCommand<typeof Transform> {
       this.logger.info('Watching file changes, press Ctrl+C to exit')
       await this.runWatch(profile, this.flags.watchInitial)
     }
+  }
+
+  /**
+   * Get data for filename format
+   */
+  getFileNameData(): Record<string, string> {
+    const data: Record<string, string> = {}
+
+    for (const item of this.flags.data || []) {
+      if (!/\w+=\w+/.test(item)) {
+        this.logger.error(`Invalid data format, should be 'key=value': ${item}`)
+        this.exit(1)
+      }
+
+      const [key, value] = item.split('=')
+      data[key] = value
+    }
+
+    return data
   }
 
   async getFiles(profile: TransformProfile): Promise<string[]> {
@@ -279,11 +314,7 @@ export default class Transform extends BaseCommand<typeof Transform> {
     return foundProfile!
   }
 
-  async getProfile(): Promise<TransformProfile> {
-    if (this.flags.profile) {
-      return this.getProfileFromConfig(this.flags.profile)
-    }
-
+  getProfileFromFlags(): TransformProfile {
     const width = this.flags.width
     const height = this.flags.height
 
@@ -308,6 +339,7 @@ export default class Transform extends BaseCommand<typeof Transform> {
         dir: this.flags.out,
         fileNameFormat: this.flags.nameFormat,
         fileNameReplace: this.flags.nameRemove ? { [this.flags.nameRemove]: '' } : undefined,
+        fileNameData: this.getFileNameData(),
       },
     }
 
@@ -325,6 +357,36 @@ export default class Transform extends BaseCommand<typeof Transform> {
 
     if (this.flags.avif) {
       profile.export.avif = true
+    }
+
+    return profile
+  }
+
+  async getProfile(): Promise<TransformProfile> {
+    const profile: TransformProfile = this.flags.profile
+      ? await this.getProfileFromConfig(this.flags.profile)
+      : this.getProfileFromFlags()
+
+    // Custom quality
+    if (this.flags.quality) {
+      profile.export = profile.export || {}
+      for (const [name, option] of Object.entries(profile.export)) {
+        if (!(name in profile.export)) continue
+
+        if (option === true) {
+          profile.export[name as keyof typeof profile.export] = { quality: this.flags.quality }
+        } else {
+          option.quality = this.flags.quality
+        }
+      }
+    }
+
+    // Add custom data to fileNameData
+    const fileNameData = this.getFileNameData()
+    profile.output = profile.output || {}
+    profile.output.fileNameData = {
+      ...profile.output.fileNameData,
+      ...fileNameData,
     }
 
     const validateProfileResult = profileSchema.safeParse(profile)

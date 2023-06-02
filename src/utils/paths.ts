@@ -73,14 +73,16 @@ export function changeName(file: string, options: ChangeNameOptions): ChangeName
   const newExt = options.ext || orgExt
   const newName = options.name || cleanupCurrentName
   const newDir = options.dir || currentDir
-  const rawFilename = replace(format, {
+  const replaceMap = {
     ...options.formatData,
     name: newName,
     ext: newExt,
     orgExt,
     orgName: cleanupCurrentName,
     orgNameExt: currentNameWithExt,
-  })
+  }
+
+  const rawFilename = replace(format, replaceMap)
 
   const safeFilename = cleanupFilename(rawFilename)
   const newFile = path.join(newDir, safeFilename)

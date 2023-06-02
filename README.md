@@ -55,13 +55,15 @@ Transform images.
 USAGE
   $ image-transform transform [FILE] [-c <value>] [-p <value>] [--withEnlargement] [-w <value>] [-h <value>]
     [--nameFormat <value>] [--nameRemove <value>] [--jpg] [--png] [--webp] [--avif] [--keepMeta] [-o <value>] [--watch]
-    [--watchInitial] [--concurrency <value>]
+    [--watchInitial] [--concurrency <value>] [-d <value>] [--quality <value>]
 
 ARGUMENTS
   FILE  Images to transform, maybe single file, dir or glob pattern. Can ignore if use `--profile`
 
 FLAGS
   -c, --configFile=<value>  [default: image-transform.config.json] Config file path
+  -d, --data=<value>...     Data to pass to filename format, can be multiple, informat of `key=value`, example: `--data
+                            name=abc --data age=20`
   -h, --height=number       Resize height, default is auto scale with width
   -o, --out=<value>         Output directory, if omit then use the same directory with input file
   -p, --profile=<value>     Profile name
@@ -73,6 +75,9 @@ FLAGS
   --nameFormat=<value>      [default: {name}.{ext}] Format of output file name
   --nameRemove=<value>      Remove part of file name
   --png                     Export to png
+  --quality=<value>         Quality of output image, override defined value in profile.
+                            Useful to reduce file size manually, use with "--data" flag to add versioning, example:
+                            "--quality 80 --data version=1"
   --watch                   Watch file changes
   --watchInitial            Watch file changes, and run initial transform for current file
   --webp                    Export to webp

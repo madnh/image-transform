@@ -55,6 +55,19 @@ export type TransformProfile = {
      */
     fileNameFormat?: string
 
+    /**
+     * Data to replace in file name, will use with fileNameFormat. Useful to add additional data to file name.
+     * This data will not override already existed data
+     *
+     * @example
+     * ```ts
+     * {
+     *   version: 'v1',
+     *   date: '2021-01-01',
+     * }
+     * ```
+     */
+    fileNameData?: Record<string, string>
     // Replace filename before process for new filename
     fileNameReplace?: Record<string, string>
     dir?: string

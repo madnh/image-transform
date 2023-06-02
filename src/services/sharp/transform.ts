@@ -134,16 +134,20 @@ export default class Transform {
   }
 
   exportTarget(rawFile: string, newFileExt: string): ChangeNameResult {
+    const formatData = {
+      ...this.profile.output?.fileNameData,
+      width: String(this.transformAction?.resize?.width) || '',
+      height: String(this.transformAction?.resize?.height) || '',
+      label: this.transformAction?.label || '',
+    }
+
+    const defaultFormat = 'version' in formatData ? `{name}__{version}.{ext}` : `{name}.{ext}`
     return changeName(rawFile, {
       ext: newFileExt,
       dir: this.profile.output?.dir,
-      format: this.profile.output?.fileNameFormat,
+      format: this.profile.output?.fileNameFormat || defaultFormat,
       replace: this.profile.output?.fileNameReplace,
-      formatData: {
-        width: String(this.transformAction?.resize?.width) || '',
-        height: String(this.transformAction?.resize?.height) || '',
-        label: this.transformAction?.label || '',
-      },
+      formatData: formatData,
     })
   }
 
