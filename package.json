@@ -17,6 +17,20 @@
     "oclif.manifest.json",
     "schema.json"
   ],
+  "scripts": {
+    "build": "shx rm -rf dist && tsc -b",
+    "postpack": "shx rm -f oclif.manifest.json",
+    "posttest": "npm run lint",
+    "prepack": "npm run build && oclif manifest && oclif readme",
+    "test": "mocha --forbid-only \"test/**/*.test.ts\"",
+    "version": "oclif readme && git add README.md",
+    "format:lint": "prettier --list-different \"src\"",
+    "format:fix": "npm run format:lint -- --write",
+    "eslint:lint": "eslint . --ext .ts --config .eslintrc",
+    "eslint:fix": "npm run eslint:lint -- --fix",
+    "lint": "npm run eslint:lint && npm run format:lint",
+    "lint:fix": "npm run eslint:fix && npm run format:fix"
+  },
   "dependencies": {
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
@@ -29,7 +43,7 @@
     "p-pipe": "^3.1.0",
     "p-queue": "^6.6.2",
     "pretty-bytes": "^5.6.0",
-    "sharp": "^0.32.1",
+    "sharp": "^0.33.1",
     "zod": "^3.21.4"
   },
   "devDependencies": {
@@ -38,7 +52,6 @@
     "@types/fs-extra": "^11.0.1",
     "@types/mocha": "^9.0.0",
     "@types/node": "^14.18.48",
-    "@types/sharp": "^0.32.0",
     "chai": "^4",
     "eslint": "^7.32.0",
     "eslint-config-oclif": "^4",
@@ -70,20 +83,6 @@
     "topicSeparator": " ",
     "topics": {}
   },
-  "scripts": {
-    "build": "shx rm -rf dist && tsc -b",
-    "postpack": "shx rm -f oclif.manifest.json",
-    "posttest": "npm run lint",
-    "prepack": "npm run build && oclif manifest && oclif readme",
-    "test": "mocha --forbid-only \"test/**/*.test.ts\"",
-    "version": "oclif readme && git add README.md",
-    "format:lint": "prettier --list-different \"src\"",
-    "format:fix": "npm run format:lint -- --write",
-    "eslint:lint": "eslint . --ext .ts --config .eslintrc",
-    "eslint:fix": "npm run eslint:lint -- --fix",
-    "lint": "npm run eslint:lint && npm run format:lint",
-    "lint:fix": "npm run eslint:fix && npm run format:fix"
-  },
   "engines": {
     "node": ">=14.15.0"
   },
@@ -94,5 +93,8 @@
     "transform",
     "sharp"
   ],
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "volta": {
+    "node": "18.19.0"
+  }
 }

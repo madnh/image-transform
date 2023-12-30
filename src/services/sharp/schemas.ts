@@ -93,7 +93,7 @@ export const exportWebpOptionsSchema = sharpOutputOptionsSchema.merge(
       nearLossless: z.boolean().optional(),
       smartSubsample: z.boolean().optional(),
       effort: z.number().optional(),
-      minSize: z.number().optional(),
+      minSize: z.boolean().optional(),
       mixed: z.boolean().optional(),
     })
   )
