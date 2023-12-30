@@ -15,7 +15,7 @@ $ npm install -g @madnh/image-transform
 $ image-transform COMMAND
 running command...
 $ image-transform (--version|--version|-v)
-@madnh/image-transform/0.0.3 darwin-arm64 node-v18.17.0
+@madnh/image-transform/0.0.4 darwin-arm64 node-v18.17.0
 $ image-transform --help [COMMAND]
 USAGE
   $ image-transform COMMAND
@@ -109,5 +109,5 @@ EXAMPLES
   $ image-transform transform images/image-1.jpg --webp --name-remove=__raw
 ```
 
-_See code: [dist/commands/transform.ts](https://github.com/madnh/image-transform/blob/v0.0.3/dist/commands/transform.ts)_
+_See code: [dist/commands/transform.ts](https://github.com/madnh/image-transform/blob/v0.0.4/dist/commands/transform.ts)_
 <!-- commandsstop -->
