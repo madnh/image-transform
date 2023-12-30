@@ -135,6 +135,7 @@ export default class Transform extends BaseCommand<typeof Transform> {
       description: `Quality of output image, override defined value in profile.
         Useful to reduce file size manually, use with "--data" flag to add versioning, example: "--quality 80 --data version=1"`,
       min: 1,
+      default: 90,
       max: 100,
     }),
   }
