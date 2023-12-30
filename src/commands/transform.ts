@@ -450,17 +450,18 @@ export default class Transform extends BaseCommand<typeof Transform> {
     const allResults = await Promise.all(jobs)
     for (const result of allResults)
       if (result) {
-        const percentStr = percent(stat.size, result.output.size, { sign: false, char: true })
+        const percentResult = percent(stat.size, result.output.size, { sign: false, char: true })
 
         const formattedNewSize = formatSize(result.output.size)
         const isOverSize = result.output.size > stat.size
+        const changeIcon = result.output.size > stat.size ? '↑' : result.output.size < stat.size ? '↓' : '='
 
         const message = [
           transformAction?.label ? `[ ${transformAction.label} ]` : '',
           result.newFile.file,
           `${result.output.width}x${result.output.height}`,
           `${formattedNewSize} / ${rawFileFormattedSize}`,
-          `${percentStr} ${isOverSize ? '↑' : '↓'}`,
+          `${percentResult.percentStr} ${changeIcon}${percentResult.changePercent}%`,
         ]
           .filter(Boolean)
           .join('   ')

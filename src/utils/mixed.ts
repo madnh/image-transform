@@ -16,12 +16,14 @@ type PercentOptions = {
    * @default false
    */
   sign?: boolean
+
+  changeValue?: boolean
 }
 
 /**
  * Calculate percent of value to base
- * @param {number} base Base value
- * @param {number} value Value to calculate
+ * @param {number} baseValue Base value
+ * @param {number} newValue Value to calculate
  * @param {PercentOptions} options Options
  * @returns {string} Percent string
  * @example
@@ -32,13 +34,20 @@ type PercentOptions = {
  *  percent(100, 150) // ↑ 150%
  *```
  */
-export function percent(base: number, value: number, options?: PercentOptions): string {
+export function percent(
+  baseValue: number,
+  newValue: number,
+  options?: PercentOptions
+): { percent: string; percentStr: string; changePercent: number } {
   const { char, sign } = options || { char: true, sign: false }
-  const result =
-    value < base ? Math.round((value / base) * 100).toPrecision(2) : Math.round((base / value) * 100).toPrecision(2)
-  const signChar = value < base ? '↓' : '↑'
+  const result = Math.round((newValue / baseValue) * 100).toFixed(0)
+  const signChar = newValue < baseValue ? '↑' : '↓'
 
-  return `${sign ? signChar : ''} ${result}${char ? '%' : ''}`.trim()
+  return {
+    percent: result,
+    percentStr: `${sign ? signChar : ''} ${result}${char ? '%' : ''}`.trim(),
+    changePercent: Math.abs(100 - Number(result)),
+  }
 }
 
 /**
